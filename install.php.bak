@@ -1,0 +1,123 @@
+<?php
+/**
+ * One-time installer: creates the database tables (from schema.sql) and the first admin account.
+ * Safe to re-run. DELETE THIS FILE once setup is complete.
+ */
+require_once __DIR__ . '/config/functions.php';
+start_session();
+
+$steps  = [];
+$errors = [];
+$ready  = false;
+$adminCount = 0;
+
+try {
+    // 1. Make sure the database exists (ignore failure if the user lacks CREATE DATABASE rights).
+    try {
+        db(false)->exec('CREATE DATABASE IF NOT EXISTS `' . str_replace('`', '', DB_NAME)
+            . '` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+    } catch (PDOException $ex) {
+        // Fall through: the database may already exist.
+    }
+
+    try {
+        $pdo = db();
+        $steps[] = 'Connected to database "' . DB_NAME . '".';
+    } catch (PDOException $ex) {
+        $available = [];
+        try {
+            $available = db(false)->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $ignored) {
+        }
+        throw new RuntimeException(
+            'Could not open database "' . DB_NAME . '" as ' . DB_USER . ': ' . $ex->getMessage()
+            . ($available ? ' — Databases this user can see: ' . implode(', ', $available) : '')
+        );
+    }
+
+    // 2. Create tables from schema.sql (skipping the CREATE DATABASE / USE lines).
+    $sql = file_get_contents(__DIR__ . '/schema.sql');
+    $sql = preg_replace('/^\s*--.*$/m', '', $sql);
+    foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
+        if (preg_match('/^(CREATE DATABASE|USE)\b/i', $statement)) {
+            continue;
+        }
+        $pdo->exec($statement);
+    }
+    $steps[] = 'Tables are in place: admins, properties, captured_reviews.';
+
+    $adminCount = (int)$pdo->query('SELECT COUNT(*) FROM admins')->fetchColumn();
+
+    // 3. Create the first admin (only while none exists).
+    if ($adminCount === 0 && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $username = post_str('username');
+        $password = (string)($_POST['password'] ?? '');
+        $confirm  = (string)($_POST['password_confirm'] ?? '');
+
+        if (!csrf_valid()) {
+            $errors[] = 'Your session expired. Please try again.';
+        }
+        if (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $username)) {
+            $errors[] = 'Username must be 3–50 characters (letters, numbers, dot, dash, underscore).';
+        }
+        if (strlen($password) < 10) {
+            $errors[] = 'Password must be at least 10 characters.';
+        }
+        if ($password !== $confirm) {
+            $errors[] = 'Passwords do not match.';
+        }
+        if (!$errors) {
+            $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)');
+            $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT)]);
+            $adminCount = 1;
+            $steps[] = 'Admin account "' . $username . '" created.';
+        }
+    }
+    $ready = true;
+} catch (Throwable $ex) {
+    $errors[] = $ex->getMessage();
+}
+?><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Install — Review System</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="public">
+<main class="card card-left">
+    <h1>Review System Setup</h1>
+
+    <?php foreach ($steps as $step): ?>
+        <p class="notice notice-success"><?= e($step) ?></p>
+    <?php endforeach; ?>
+    <?php foreach ($errors as $error): ?>
+        <p class="notice notice-error"><?= e($error) ?></p>
+    <?php endforeach; ?>
+
+    <?php if ($ready && $adminCount === 0): ?>
+        <h2>Create the first admin account</h2>
+        <form method="post" class="form">
+            <?= csrf_field() ?>
+            <label>Username
+                <input type="text" name="username" required minlength="3" maxlength="50" value="<?= e(post_str('username')) ?>" autocomplete="username">
+            </label>
+            <label>Password (10+ characters)
+                <input type="password" name="password" required minlength="10" autocomplete="new-password">
+            </label>
+            <label>Confirm password
+                <input type="password" name="password_confirm" required minlength="10" autocomplete="new-password">
+            </label>
+            <button type="submit" class="btn btn-primary">Create admin</button>
+        </form>
+    <?php elseif ($ready): ?>
+        <p>Setup is complete. <strong>Delete <code>install.php</code> from the server now</strong>, then sign in.</p>
+        <p><a class="btn btn-primary" href="admin/login.php">Go to admin login</a></p>
+    <?php else: ?>
+        <p>Check the settings in <code>config/db.php</code> and reload this page.</p>
+    <?php endif; ?>
+</main>
+</body>
+</html>

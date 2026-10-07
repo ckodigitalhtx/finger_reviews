@@ -1,0 +1,5 @@
+# Keep the SQL schema and docs out of public reach
+<FilesMatch "\.(sql|md)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes
