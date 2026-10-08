@@ -3,6 +3,7 @@
  * Property list + delete.
  */
 require_once __DIR__ . '/auth.php';
+require_super();
 
 // ---- Delete ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_str('action') === 'delete') {
@@ -11,8 +12,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_str('action') === 'delete') {
         flash('Could not delete the property. Please try again.', 'error');
     } else {
         try {
+            $stmt = db()->prepare('SELECT logo_path FROM properties WHERE id = ?');
+            $stmt->execute([$id]);
+            $logo = $stmt->fetchColumn();
+
             $stmt = db()->prepare('DELETE FROM properties WHERE id = ?');
             $stmt->execute([$id]);
+            if ($stmt->rowCount()) {
+                delete_logo_file($logo ?: null);
+            }
             flash($stmt->rowCount() ? 'Property deleted.' : 'Property not found.', $stmt->rowCount() ? 'success' : 'error');
         } catch (PDOException $ex) {
             error_log('admin/properties.php: ' . $ex->getMessage());
@@ -60,6 +68,9 @@ require __DIR__ . '/header.php';
                 <?php $url = public_review_url((int)$p['id']); ?>
                 <tr>
                     <td>
+                        <?php if (!empty($p['logo_path'])): ?>
+                            <img class="logo-thumb" src="<?= e(logo_url($p['logo_path'], '../')) ?>" alt="">
+                        <?php endif; ?>
                         <strong><?= e($p['property_name']) ?></strong><br>
                         <span class="muted small"><?= e($p['notification_email']) ?></span>
                     </td>
@@ -77,7 +88,7 @@ require __DIR__ . '/header.php';
                         <div class="actions">
                             <a class="btn btn-secondary btn-small" href="<?= e($url) ?>" target="_blank" rel="noopener">View</a>
                             <a class="btn btn-secondary btn-small" href="property-edit.php?id=<?= (int)$p['id'] ?>">Edit</a>
-                            <form method="post" onsubmit="return confirm('Delete this property and all of its captured feedback? This cannot be undone.');">
+                            <form method="post" onsubmit="return confirm('Delete this property, all of its captured feedback and its property user? This cannot be undone.');">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">

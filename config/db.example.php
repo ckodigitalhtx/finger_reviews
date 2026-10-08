@@ -8,13 +8,18 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'review_system');
 define('DB_USER', 'gated_reviews');
-define('DB_PASS', '95Gmcslt!');
+define('DB_PASS', 'your-database-password');
 define('DB_CHARSET', 'utf8mb4');
 
 // ---- Email ----
 // "From" address used on alert emails. Use an address on a domain your server may send for.
 define('MAIL_FROM', 'no-reply@localhost');
 define('MAIL_FROM_NAME', 'Resident Feedback');
+
+// ---- Site address ----
+// Full address of this install, no trailing slash. Used in emailed password links.
+// Set this on live servers, e.g. 'https://reviews.example.com'. Leave '' to detect automatically.
+define('APP_URL', '');
 
 /**
  * Returns a shared PDO connection.

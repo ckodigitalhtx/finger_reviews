@@ -58,6 +58,9 @@ $wording = $property && trim((string)$property['custom_wording']) !== ''
 </head>
 <body class="public">
 <main class="card">
+<?php if ($property && !empty($property['logo_path'])): ?>
+    <img class="property-logo" src="<?= e(logo_url($property['logo_path'])) ?>" alt="<?= e($property['property_name']) ?>">
+<?php endif; ?>
 <?php if (!$property): ?>
     <h1><?= $dbError ? 'We&rsquo;ll be right back' : 'Page not found' ?></h1>
     <p class="lead">
@@ -73,7 +76,6 @@ $wording = $property && trim((string)$property['custom_wording']) !== ''
 
 <?php else: ?>
     <p class="eyebrow">How are we doing?</p>
-    <h1><?= e($property['property_name']) ?></h1>
     <p class="lead"><?= nl2br(e($wording)) ?></p>
 
     <div class="stars" id="stars" role="radiogroup" aria-label="Star rating" data-initial="<?= $initialRating ?>">

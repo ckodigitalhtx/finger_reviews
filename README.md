@@ -19,6 +19,25 @@ PHP 7.4+ (PDO MySQL), MySQL 5.7+/MariaDB, Apache.
 4. **Delete `install.php`.**
 5. Sign in at `/admin/`, add a property, and share its review link (`review.php?property_id=X`).
 
+## Users and roles
+
+- **Super admin** — all properties, all feedback, and the **Users** page (add/edit/delete users, email password links).
+- **Property user** — one per property. Sees only that property's dashboard and feedback, and can edit its
+  review page (wording, logo, links, alert email). Cannot add or delete properties or manage users.
+
+Deleting a property also deletes its property user.
+
+## Password resets
+
+- **Forgot your password?** on the sign-in page emails a one-time link (expires in 60 minutes).
+- Super admins can click **Email password link** for any user (expires in 72 hours). New users created
+  without a password get the same link so they choose their own.
+- If the server can't send email, the super admin is shown the link to pass on by hand.
+- Every user needs an email address for this to work — add yours under **Account**.
+- Set `APP_URL` in `config/db.php` on live servers so emailed links always point at your real domain.
+
+Database changes are applied automatically the first time anyone signs in after an update.
+
 ## Email
 
 Alerts use PHP `mail()`. WAMP does not send mail out of the box — point `SMTP`/`smtp_port`/`sendmail_from`

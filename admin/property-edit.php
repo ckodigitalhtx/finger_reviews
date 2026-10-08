@@ -5,9 +5,16 @@
 require_once __DIR__ . '/auth.php';
 
 $id       = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: null;
+
+// Property users can only edit their own property, and cannot add new ones
+if (!is_super() && $id !== scoped_property_id()) {
+    redirect('property-edit.php?id=' . scoped_property_id());
+}
+$listUrl = is_super() ? 'properties.php' : 'property-edit.php?id=' . scoped_property_id();
 $errors   = [];
 $linkCols = array_keys(review_platforms());
 
+$currentLogo = null;
 $property = array_fill_keys(
     array_merge(['property_name', 'notification_email', 'custom_wording'], $linkCols),
     ''
@@ -30,10 +37,16 @@ if ($id) {
     foreach ($property as $key => $unused) {
         $property[$key] = (string)($row[$key] ?? '');
     }
+    $currentLogo = $row['logo_path'] ?? null;
 }
 
 // ---- Save ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$postTooLarge = $_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST)
+    && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0;
+
+if ($postTooLarge) {
+    $errors[] = 'The uploaded file is too large for this server. Please use a logo under 2 MB.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($property as $key => $unused) {
         $property[$key] = post_str($key);
     }
@@ -69,9 +82,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Logo: upload only once the rest of the form is valid, so no orphan files are left behind
+    $newLogo    = null;
+    $removeLogo = !empty($_POST['remove_logo']);
     if (!$errors) {
-        $columns = array_keys($property);
+        [$newLogo, $uploadError] = handle_logo_upload('logo');
+        if ($uploadError) {
+            $errors[] = $uploadError;
+        }
+    }
+
+    if (!$errors) {
+        $logoValue = $newLogo ?? ($removeLogo ? null : $currentLogo);
+
+        $columns = array_merge(array_keys($property), ['logo_path']);
         $values  = array_map(static fn($v) => $v === '' ? null : $v, array_values($property));
+        $values[] = $logoValue;
 
         try {
             if ($id) {
@@ -87,8 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute($values);
                 flash('Property added. Its review page link is listed below.');
             }
-            redirect('properties.php');
+            if ($currentLogo && $currentLogo !== $logoValue) {
+                delete_logo_file($currentLogo);   // replaced or removed
+            }
+            redirect($listUrl);
         } catch (PDOException $ex) {
+            delete_logo_file($newLogo);   // don't keep a file the database doesn't know about
             error_log('admin/property-edit.php: ' . $ex->getMessage());
             $errors[] = 'Could not save the property. Please try again.';
         }
@@ -111,7 +141,7 @@ require __DIR__ . '/header.php';
     </div>
 <?php endif; ?>
 
-<form method="post" class="form box box-narrow">
+<form method="post" class="form box box-narrow" enctype="multipart/form-data">
     <?= csrf_field() ?>
 
     <label>Property name
@@ -128,6 +158,20 @@ require __DIR__ . '/header.php';
         <span class="hint">Greeting shown above the stars. Leave blank to use the default greeting.</span>
     </label>
 
+    <div class="logo-field">
+        <span class="field-label">Logo <span class="optional">(optional)</span></span>
+        <?php if ($currentLogo): ?>
+            <div class="logo-current">
+                <img src="<?= e(logo_url($currentLogo, '../')) ?>" alt="Current logo for <?= e($property['property_name']) ?>">
+                <label class="checkbox"><input type="checkbox" name="remove_logo" value="1"> Remove this logo</label>
+            </div>
+        <?php endif; ?>
+        <label><?= $currentLogo ? 'Replace with a new file' : 'Upload a file' ?>
+            <input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/webp">
+            <span class="hint">PNG, JPG, GIF or WebP, up to 2 MB. Shown at the top of the review page. A transparent PNG about 600 px wide looks best.</span>
+        </label>
+    </div>
+
     <h2>Review links</h2>
     <p class="muted small">Shown to residents who choose 4 or 5 stars. Only platforms with a link get a button.</p>
 
@@ -141,7 +185,7 @@ require __DIR__ . '/header.php';
 
     <div class="form-actions">
         <button type="submit" class="btn btn-primary"><?= $id ? 'Save changes' : 'Add property' ?></button>
-        <a class="btn btn-secondary" href="properties.php">Cancel</a>
+        <a class="btn btn-secondary" href="<?= e(is_super() ? 'properties.php' : 'index.php') ?>">Cancel</a>
     </div>
 </form>
 <?php require __DIR__ . '/footer.php'; ?>

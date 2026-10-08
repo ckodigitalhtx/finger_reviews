@@ -44,6 +44,7 @@ try {
         }
         $pdo->exec($statement);
     }
+    migrate_schema($pdo);
     $steps[] = 'Tables are in place: admins, properties, captured_reviews.';
 
     $adminCount = (int)$pdo->query('SELECT COUNT(*) FROM admins')->fetchColumn();
@@ -51,6 +52,7 @@ try {
     // 3. Create the first admin (only while none exists).
     if ($adminCount === 0 && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = post_str('username');
+        $email    = post_str('email');
         $password = (string)($_POST['password'] ?? '');
         $confirm  = (string)($_POST['password_confirm'] ?? '');
 
@@ -60,6 +62,9 @@ try {
         if (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $username)) {
             $errors[] = 'Username must be 3–50 characters (letters, numbers, dot, dash, underscore).';
         }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Enter a valid email address (used for password resets).';
+        }
         if (strlen($password) < 10) {
             $errors[] = 'Password must be at least 10 characters.';
         }
@@ -67,8 +72,8 @@ try {
             $errors[] = 'Passwords do not match.';
         }
         if (!$errors) {
-            $stmt = $pdo->prepare('INSERT INTO admins (username, password_hash) VALUES (?, ?)');
-            $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT)]);
+            $stmt = $pdo->prepare("INSERT INTO admins (username, email, password_hash, role) VALUES (?, ?, ?, 'super')");
+            $stmt->execute([$username, $email, password_hash($password, PASSWORD_DEFAULT)]);
             $adminCount = 1;
             $steps[] = 'Admin account "' . $username . '" created.';
         }
@@ -98,11 +103,14 @@ try {
     <?php endforeach; ?>
 
     <?php if ($ready && $adminCount === 0): ?>
-        <h2>Create the first admin account</h2>
+        <h2>Create the first super admin account</h2>
         <form method="post" class="form">
             <?= csrf_field() ?>
             <label>Username
                 <input type="text" name="username" required minlength="3" maxlength="50" value="<?= e(post_str('username')) ?>" autocomplete="username">
+            </label>
+            <label>Email
+                <input type="email" name="email" required maxlength="150" value="<?= e(post_str('email')) ?>" autocomplete="email">
             </label>
             <label>Password (10+ characters)
                 <input type="password" name="password" required minlength="10" autocomplete="new-password">

@@ -1,1 +1,3 @@
 config/db.php
+uploads/logos/*
+!uploads/logos/.gitkeep

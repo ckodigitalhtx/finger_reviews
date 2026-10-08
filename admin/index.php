@@ -9,20 +9,34 @@ $recent  = [];
 $dbError = '';
 
 try {
-    $pdo = db();
-    $stats['properties'] = (int)$pdo->query('SELECT COUNT(*) FROM properties')->fetchColumn();
-    $stats['reviews']    = (int)$pdo->query('SELECT COUNT(*) FROM captured_reviews')->fetchColumn();
-    $stats['last30']     = (int)$pdo->query(
-        'SELECT COUNT(*) FROM captured_reviews WHERE created_at >= (NOW() - INTERVAL 30 DAY)'
-    )->fetchColumn();
+    $pdo   = db();
+    $scope = scoped_property_id();               // null = all properties (super admin)
+    $where = $scope ? 'WHERE r.property_id = ?' : '';
+    $args  = $scope ? [$scope] : [];
 
-    $recent = $pdo->query(
-        'SELECT r.*, p.property_name
+    $stats['properties'] = (int)$pdo->query('SELECT COUNT(*) FROM properties')->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM captured_reviews r $where");
+    $stmt->execute($args);
+    $stats['reviews'] = (int)$stmt->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM captured_reviews r '
+        . ($where ? $where . ' AND' : 'WHERE') . ' r.created_at >= (NOW() - INTERVAL 30 DAY)'
+    );
+    $stmt->execute($args);
+    $stats['last30'] = (int)$stmt->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        "SELECT r.*, p.property_name
            FROM captured_reviews r
            JOIN properties p ON p.id = r.property_id
+           $where
           ORDER BY r.created_at DESC, r.id DESC
-          LIMIT 5'
-    )->fetchAll();
+          LIMIT 5"
+    );
+    $stmt->execute($args);
+    $recent = $stmt->fetchAll();
 } catch (PDOException $ex) {
     error_log('admin/index.php: ' . $ex->getMessage());
     $dbError = 'Could not load dashboard data.';
@@ -32,14 +46,20 @@ $pageTitle = 'Dashboard';
 require __DIR__ . '/header.php';
 ?>
 <div class="page-head">
-    <h1>Dashboard</h1>
-    <a class="btn btn-primary" href="property-edit.php">Add property</a>
+    <h1>Dashboard<?php if (!is_super()): ?> <span class="muted">· <?= e(current_user()['property_name']) ?></span><?php endif; ?></h1>
+    <?php if (is_super()): ?>
+        <a class="btn btn-primary" href="property-edit.php">Add property</a>
+    <?php else: ?>
+        <a class="btn btn-secondary" href="<?= e(public_review_url((int)scoped_property_id())) ?>" target="_blank" rel="noopener">View review page</a>
+    <?php endif; ?>
 </div>
 
 <?php if ($dbError): ?><p class="notice notice-error"><?= e($dbError) ?></p><?php endif; ?>
 
 <div class="stats">
-    <div class="stat"><div class="stat-value"><?= $stats['properties'] ?></div><div class="stat-label">Properties</div></div>
+    <?php if (is_super()): ?>
+        <div class="stat"><div class="stat-value"><?= $stats['properties'] ?></div><div class="stat-label">Properties</div></div>
+    <?php endif; ?>
     <div class="stat"><div class="stat-value"><?= $stats['last30'] ?></div><div class="stat-label">Feedback, last 30 days</div></div>
     <div class="stat"><div class="stat-value"><?= $stats['reviews'] ?></div><div class="stat-label">Feedback, all time</div></div>
 </div>

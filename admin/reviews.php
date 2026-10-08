@@ -6,6 +6,9 @@ require_once __DIR__ . '/auth.php';
 
 $perPage    = 25;
 $propertyId = filter_input(INPUT_GET, 'property_id', FILTER_VALIDATE_INT) ?: 0;
+if (!is_super()) {
+    $propertyId = (int)scoped_property_id();   // always limited to their own property
+}
 $search     = isset($_GET['q']) && is_string($_GET['q']) ? trim($_GET['q']) : '';
 $page       = max(1, (int)(filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT) ?: 1));
 
@@ -75,6 +78,7 @@ require __DIR__ . '/header.php';
 <?php if ($dbError): ?><p class="notice notice-error"><?= e($dbError) ?></p><?php endif; ?>
 
 <form method="get" class="form box filters">
+    <?php if (is_super()): ?>
     <label>Property
         <select name="property_id">
             <option value="">All properties</option>
@@ -83,11 +87,12 @@ require __DIR__ . '/header.php';
             <?php endforeach; ?>
         </select>
     </label>
+    <?php endif; ?>
     <label>Search
         <input type="search" name="q" value="<?= e($search) ?>" placeholder="Name, email, phone or comments">
     </label>
     <button type="submit" class="btn btn-primary">Filter</button>
-    <?php if ($propertyId || $search !== ''): ?>
+    <?php if ((is_super() && $propertyId) || $search !== ''): ?>
         <a class="btn btn-secondary" href="reviews.php">Clear</a>
     <?php endif; ?>
 </form>

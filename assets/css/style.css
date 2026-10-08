@@ -161,6 +161,22 @@ body.public {
 .panel > p { color: var(--muted); }
 .review-links { display: grid; gap: .65rem; margin-top: 1.25rem; }
 
+/* Property logo */
+.property-logo {
+    display: block;
+    max-width: min(240px, 70%);
+    max-height: 110px;
+    width: auto;
+    height: auto;
+    margin: 0 auto 1.5rem;
+    object-fit: contain;
+    width: 80%;
+    display: block;
+    text-align: center;
+    margin-right: auto;
+    margin-left: auto;
+}
+
 /* ==========================================================================
    Admin panel
    ========================================================================== */
@@ -240,6 +256,30 @@ table.data tr:last-child td { border-bottom: 0; }
 
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .login-wrap .box { width: 100%; max-width: 380px; padding: 2rem 1.75rem; }
+
+/* Logo upload (admin) */
+.logo-field { margin-bottom: 1.25rem; }
+.field-label { display: block; margin-bottom: .5rem; font-weight: 600; font-size: .9rem; }
+.logo-current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: .75rem;
+    padding: .75rem;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    background: #faf9f7;
+}
+.logo-current img { max-width: 200px; max-height: 80px; object-fit: contain; }
+.form label.checkbox { display: flex; align-items: center; gap: .4rem; margin: 0; font-weight: 400; }
+.form input[type="file"] { display: block; margin-top: .35rem; font: inherit; font-weight: 400; max-width: 100%; }
+.logo-thumb { display: block; max-width: 90px; max-height: 36px; margin-bottom: .35rem; object-fit: contain; }
+
+/* Signed-out pages + role extras */
+.auth-alt { margin: 1rem 0 0; text-align: center; font-size: .9rem; }
+.admin-brand-sub { font-weight: 400; color: #cfd6df; margin-left: .35rem; }
+.page-head h1 .muted { font-weight: 400; }
 
 @media (max-width: 640px) {
     h1 { font-size: 1.6rem; }
