@@ -8,7 +8,7 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'review_system');
 define('DB_USER', 'gated_reviews');
-define('DB_PASS', '95Gmcslt!');
+define('DB_PASS', '******!');
 define('DB_CHARSET', 'utf8mb4');
 
 // ---- Email ----
